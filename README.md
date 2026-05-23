@@ -1,36 +1,50 @@
 # @voice/wake-word
 
-Wake-word engine **interface** and a **mock implementation** for the desktop voice assistant platform.
+Wake-word engine **interface**, **mock**, and **push-to-talk** implementations for the desktop voice assistant platform.
 
-No native binaries — adapters (e.g. `@voice/wake-word-porcupine`) implement `IWakeWordEngine` in separate packages.
+No wake-word model or vendor keys required for POC — use `PushToTalkWakeEngine` and wire `trigger()` to a hotkey or tray action. Native adapters (e.g. `@voice/wake-word-porcupine`) are optional.
 
 ## Install
 
 ```bash
 npm install @voice/wake-word @voice/core-types
+# For mic + PTT demo / attachPushToTalkListener:
+npm install @voice/mic-capture
 ```
 
-## Usage
+## Push-to-talk (Option A — recommended for POC)
 
-### Implementing an adapter
+No Picovoice AccessKey. The mic stays on; you start a “session” when the user presses a key or hotkey.
 
 ```typescript
-import type { AudioFrame, WakeHit } from "@voice/core-types";
-import type { IWakeWordEngine, WakeWordEngineOptions } from "@voice/wake-word";
+import { createMicCapture } from "@voice/mic-capture";
+import {
+  attachPushToTalkListener,
+  createPushToTalkWakeEngine,
+} from "@voice/wake-word";
 
-export class PorcupineWakeWordEngine implements IWakeWordEngine {
-  constructor(_options: WakeWordEngineOptions) {}
+const mic = createMicCapture();
+const engine = createPushToTalkWakeEngine({ keyword: "listen" });
 
-  process(_frame: AudioFrame): WakeHit | null {
-    // delegate to @picovoice/porcupine-node
-    return null;
-  }
+const ptt = attachPushToTalkListener({
+  mic,
+  engine,
+  debounceMs: 2000,
+  onWake: (hit) => {
+    // → start voice-session / show mascot / begin utterance capture
+    console.log("Listen now:", hit.keyword);
+  },
+});
 
-  dispose(): void {}
-}
+await ptt.start();
+
+// From Electron globalShortcut, tray click, etc.:
+ptt.trigger();
 ```
 
-### Mock engine (tests / demos)
+`process(frame)` on the PTT engine always returns `null` (audio is ignored).
+
+## Mock engine (automated tests)
 
 ```typescript
 import { createAudioFrame } from "@voice/core-types";
@@ -41,16 +55,36 @@ const engine = createMockWakeWordEngine({
   keyword: "jarvis",
 });
 
-const frame = createAudioFrame(new Int16Array(512), Date.now());
-const hit = engine.process(frame);
+const hit = engine.process(createAudioFrame(new Int16Array(512), Date.now()));
 ```
 
-## CLI demo
+## Implementing a real wake-word adapter
+
+```typescript
+import type { AudioFrame, WakeHit } from "@voice/core-types";
+import type { IWakeWordEngine, WakeWordEngineOptions } from "@voice/wake-word";
+
+export class SherpaWakeWordEngine implements IWakeWordEngine {
+  process(_frame: AudioFrame): WakeHit | null {
+    return null;
+  }
+  dispose(): void {}
+}
+```
+
+## CLI demos
 
 After `npm run build`:
 
 ```bash
-npx wake-word-mock-demo --frames 30 --trigger-after 8 --keyword jarvis
+# Push-to-talk (Press Enter) — default demo, mock mic in CI
+npx wake-word-ptt-demo --mock-mic
+
+# Live microphone + Enter to listen
+npx wake-word-ptt-demo
+
+# Synthetic frame-based mock wake (no PTT)
+npx wake-word-mock-demo --frames 30 --trigger-after 8
 ```
 
 ## API
@@ -58,11 +92,12 @@ npx wake-word-mock-demo --frames 30 --trigger-after 8 --keyword jarvis
 | Export | Description |
 |--------|-------------|
 | `IWakeWordEngine` | `process(frame)` → `WakeHit \| null`, `dispose()` |
-| `WakeWordEngineOptions` | Shared config: paths, keywords, sensitivity, access key |
-| `WakeWordEngineFactory` | Factory type for adapter packages |
+| `ITriggerableWakeWordEngine` | Adds `trigger()` for manual wake |
+| `PushToTalkWakeEngine` | Ignores audio; wake on `trigger()` |
+| `attachPushToTalkListener` | Mic + debounced `trigger()` → `onWake` |
+| `isTriggerableWakeWordEngine` | Type guard |
 | `MockWakeWordEngine` | Deterministic test double |
-| `createMockWakeWordEngine` | Factory for mock engine |
-| `createSyntheticFrame` | Generate PCM frames for tests |
+| `WakeWordEngineOptions` | Shared config shape for adapters |
 
 ## Development
 
@@ -74,10 +109,8 @@ npm run lint
 npm run demo
 ```
 
-Requires `@voice/core-types@^0.1.0` (published) or `file:../voice-core-types` during local development.
+Requires `@voice/core-types@^0.1.0` and optionally `@voice/mic-capture@^0.1.0`.
 
-## Publish
+## License
 
-1. Ensure `@voice/core-types@^0.1.0` is on npm.
-2. Change `dependencies["@voice/core-types"]` from `file:../...` to `^0.1.0` if needed.
-3. `npm publish --access public`
+MIT

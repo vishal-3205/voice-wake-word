@@ -10,3 +10,21 @@ export {
   createSyntheticFrame,
   type MockWakeWordEngineOptions,
 } from "./mock-engine.js";
+
+export {
+  type ITriggerableWakeWordEngine,
+  type PushToTalkTriggerOptions,
+  isTriggerableWakeWordEngine,
+} from "./triggerable-engine.js";
+
+export {
+  PushToTalkWakeEngine,
+  createPushToTalkWakeEngine,
+  type PushToTalkWakeEngineOptions,
+} from "./ptt-engine.js";
+
+export {
+  attachPushToTalkListener,
+  type PushToTalkListenerOptions,
+  type PushToTalkListenerHandle,
+} from "./listener.js";

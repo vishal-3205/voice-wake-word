@@ -8,4 +8,10 @@ describe("package exports", () => {
     expect(wakeWord.MockWakeWordEngine).toBeDefined();
     expect(wakeWord.createSyntheticFrame).toBeDefined();
   });
+
+  it("exposes push-to-talk helpers", () => {
+    expect(typeof wakeWord.createPushToTalkWakeEngine).toBe("function");
+    expect(typeof wakeWord.attachPushToTalkListener).toBe("function");
+    expect(typeof wakeWord.isTriggerableWakeWordEngine).toBe("function");
+  });
 });
